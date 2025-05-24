@@ -234,49 +234,95 @@ def update_readme(generated_reports):
         else:
             content = "# Daily Development Reports\n\n"
         
-        # Prepare new entry for today
+        # 获取今天日期的所有报告文件
         date_str = today.strftime('%Y-%m-%d')
-        new_entry = f"\n## {date_str}\n\n"
+        run_dir = f"logs/{date_str}"
         
+        all_today_reports = []
+        if os.path.exists(run_dir):
+            # 遍历今天的目录，获取所有报告文件
+            for filename in os.listdir(run_dir):
+                if filename.endswith('.md'):
+                    file_path = f"{run_dir}/{filename}"
+                    all_today_reports.append(file_path)
+        
+        # 添加本次生成的报告
         for report_path in generated_reports:
-            # Extract filename from path
-            filename = os.path.basename(report_path)
-            # Create relative path from README to report
-            relative_path = report_path
-            new_entry += f"[{filename}]({relative_path})\n\n"
+            if report_path not in all_today_reports:
+                all_today_reports.append(report_path)
         
-        # Check if today's date already exists in README
+        # 按文件名中的时间戳排序（降序，新的在前）
+        def extract_timestamp(file_path):
+            """从文件路径中提取时间戳"""
+            filename = os.path.basename(file_path)
+            # 文件名格式: HHMMSS_repo_name.md
+            timestamp_match = re.match(r'^(\d{6})_', filename)
+            if timestamp_match:
+                return timestamp_match.group(1)
+            return "000000"  # 如果没有匹配到时间戳，给个默认值
+        
+        all_today_reports.sort(key=extract_timestamp, reverse=True)
+        
+        # 准备今天的条目
+        new_entry = f"\n## {date_str}\n\n"
+        for report_path in all_today_reports:
+            filename = os.path.basename(report_path)
+            # 提取时间戳用于显示
+            timestamp = extract_timestamp(report_path)
+            formatted_time = f"{timestamp[:2]}:{timestamp[2:4]}:{timestamp[4:6]}"
+            
+            # 提取仓库名（去掉时间戳前缀和.md后缀）
+            repo_name = filename
+            if re.match(r'^\d{6}_', filename):
+                repo_name = filename[7:]  # 去掉 "HHMMSS_" 前缀
+            if repo_name.endswith('.md'):
+                repo_name = repo_name[:-3]  # 去掉 ".md" 后缀
+            
+            new_entry += f"- [{formatted_time}] [{repo_name}]({report_path})\n"
+        
+        new_entry += "\n"
+        
+        # 检查今天的日期是否已存在于README中
         date_pattern = f"## {re.escape(date_str)}"
         
         if re.search(date_pattern, content):
-            # Replace existing entry for today
-            # Find the section for today and replace it
-            pattern = f"(## {re.escape(date_str)}.*?)(?=## \\d{{4}}-\\d{{2}}-\\d{{2}}|$)"
-            replacement = f"## {date_str}\n\n" + "\n".join([f"[{os.path.basename(path)}]({path})\n" for path in generated_reports]) + "\n"
+            # 替换今天现有的条目
+            # 使用更精确的正则表达式来匹配整个日期section
+            pattern = f"(## {re.escape(date_str)}.*?)(?=\n## \\d{{4}}-\\d{{2}}-\\d{{2}}|\n# |$)"
+            replacement = f"## {date_str}\n\n" + "\n".join([
+                f"- [{extract_timestamp(path)[:2]}:{extract_timestamp(path)[2:4]}:{extract_timestamp(path)[4:6]}] "
+                f"[{os.path.basename(path)[7:-3] if re.match(r'^\\d{{6}}_', os.path.basename(path)) else os.path.basename(path)[:-3]}]({path})"
+                for path in all_today_reports
+            ]) + "\n"
+            
             content = re.sub(pattern, replacement, content, flags=re.DOTALL)
         else:
-            # Add new entry at the beginning (after title if exists)
-            if content.startswith("# "):
-                # Find end of title section
-                lines = content.split('\n')
-                title_end = 0
-                for i, line in enumerate(lines):
-                    if line.startswith("# "):
-                        title_end = i + 1
+            # 在README中添加新条目
+            # 找到合适的插入位置（按日期降序）
+            lines = content.split('\n')
+            insert_index = len(lines)
+            
+            # 寻找插入位置：找到第一个比今天日期小的日期
+            for i, line in enumerate(lines):
+                date_match = re.match(r'^## (\d{4}-\d{2}-\d{2})', line)
+                if date_match:
+                    existing_date = date_match.group(1)
+                    if existing_date < date_str:
+                        insert_index = i
                         break
-                
-                # Insert new entry after title
-                lines.insert(title_end + 1, new_entry.strip())
-                content = '\n'.join(lines)
-            else:
-                # No title found, add at beginning
-                content = new_entry + content
+            
+            # 在找到的位置插入新条目
+            new_entry_lines = new_entry.strip().split('\n')
+            for j, new_line in enumerate(reversed(new_entry_lines)):
+                lines.insert(insert_index, new_line)
+            
+            content = '\n'.join(lines)
         
-        # Write updated README
+        # 写入更新后的README
         with open(readme_path, 'w', encoding='utf-8') as f:
             f.write(content)
         
-        print(f"README.md updated with {len(generated_reports)} report links")
+        print(f"README.md updated with {len(all_today_reports)} report links (sorted by time)")
         return True
         
     except Exception as e:
