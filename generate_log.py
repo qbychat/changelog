@@ -2,6 +2,7 @@ import os
 import requests
 from datetime import datetime, timedelta
 from dateutil import parser
+import pytz
 import re
 
 # Configuration
@@ -12,11 +13,22 @@ days_to_cover = int(os.getenv('DAYS_TO_COVER', '1'))
 additional_repos_str = os.getenv('ADDITIONAL_REPOS', '')
 additional_repos = [repo.strip() for repo in additional_repos_str.split(',') if repo.strip()]
 
-# Date setup
-today = datetime.utcnow().date()
+# 设置时区 - 使用北京时间
+beijing_tz = pytz.timezone('Asia/Shanghai')
+utc_tz = pytz.UTC
+
+# Date setup - 使用北京时间
+beijing_now = datetime.now(beijing_tz)
+today = beijing_now.date()
 since_date = today - timedelta(days=days_to_cover)
 
-print(f"Generating reports for period: {since_date} to {today}")
+# 转换为UTC时间用于GitHub API调用
+today_utc_start = beijing_tz.localize(datetime.combine(today, datetime.min.time())).astimezone(utc_tz)
+since_utc_start = beijing_tz.localize(datetime.combine(since_date, datetime.min.time())).astimezone(utc_tz)
+
+print(f"北京时间当前时间: {beijing_now.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+print(f"生成报告的北京时间日期范围: {since_date} 到 {today}")
+print(f"对应的UTC时间范围: {since_utc_start.isoformat()} 到 {today_utc_start.isoformat()}")
 print(f"Manual trigger: {is_manual}")
 print(f"Additional repositories to process: {additional_repos}")
 
@@ -27,8 +39,8 @@ github_headers = {
 }
 
 def generate_timestamp():
-    """Generate timestamp for file naming"""
-    return datetime.now().strftime("%H%M%S")
+    """Generate timestamp for file naming - 使用北京时间"""
+    return beijing_now.strftime("%H%M%S")
 
 def get_commits(repo, since, until):
     """Fetch commits for a given repository"""
@@ -201,11 +213,11 @@ def save_report(content, repo_name):
         # Create logs directory if not exists
         os.makedirs('logs', exist_ok=True)
         
-        # Create subdirectory for this run
+        # Create subdirectory for this run - 使用北京时间日期
         run_dir = f"logs/{today.isoformat()}"
         os.makedirs(run_dir, exist_ok=True)
         
-        # Generate filename with timestamp
+        # Generate filename with timestamp - 使用北京时间时间戳
         timestamp = generate_timestamp()
         filename = f"{run_dir}/{timestamp}_{repo_name.replace('/', '_')}.md"
         
@@ -234,7 +246,7 @@ def update_readme(generated_reports):
         else:
             content = "# Daily Development Reports\n\n"
         
-        # 获取今天日期的所有报告文件
+        # 获取今天日期的所有报告文件 - 使用北京时间日期
         date_str = today.strftime('%Y-%m-%d')
         run_dir = f"logs/{date_str}"
         
@@ -356,7 +368,8 @@ def process_repository(repo):
         print(f"DeepSeek API key not found, skipping {repo}")
         return None
     
-    commits = get_commits(repo, since_date, today)
+    # 使用UTC时间调用GitHub API
+    commits = get_commits(repo, since_utc_start, today_utc_start)
     
     if not commits:
         if is_manual:
