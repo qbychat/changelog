@@ -67,41 +67,66 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           
-          # 先拉取远程更改以避免推送冲突
-          echo "Pulling latest changes..."
-          git pull origin main --rebase
-          
-          # 添加所有变更的文件
-          git add logs/ README.md
-          
-          # 检查是否有变更
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            echo "Changes detected, committing..."
+          # 检查是否有文件需要处理
+          if [ -d "logs" ] || [ -f "README.md" ]; then
+            echo "Checking for changes..."
+            
+            # 显示当前状态
             git status --porcelain
-            git commit -m "Add daily code reports and update README for $(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S CST')"
             
-            # 推送前再次检查并处理可能的冲突
-            echo "Pushing changes..."
-            max_retries=3
-            retry_count=0
-            
-            while [ $retry_count -lt $max_retries ]; do
-              if git push origin main; then
-                echo "Reports and README committed and pushed successfully"
-                break
-              else
-                echo "Push failed, attempt $((retry_count + 1))/$max_retries"
-                retry_count=$((retry_count + 1))
-                
-                if [ $retry_count -lt $max_retries ]; then
-                  echo "Pulling latest changes and retrying..."
-                  git pull origin main --rebase
-                else
-                  echo "Max retries reached, push failed"
-                  exit 1
-                fi
+            # 如果有未跟踪或修改的文件，先暂存它们
+            if [ -n "$(git status --porcelain)" ]; then
+              echo "Stashing any uncommitted changes temporarily..."
+              git stash push -u -m "Temporary stash for pull"
+              
+              # 拉取远程更改
+              echo "Pulling latest changes..."
+              git pull origin main --rebase
+              
+              # 恢复暂存的更改
+              echo "Restoring stashed changes..."
+              if git stash list | grep -q "Temporary stash for pull"; then
+                git stash pop
               fi
-            done
+              
+              # 添加所有变更的文件
+              echo "Adding changes..."
+              git add logs/ README.md
+              
+              # 检查是否真正有变更需要提交
+              if git diff --staged --quiet; then
+                echo "No changes to commit after merge"
+              else
+                echo "Changes detected, committing..."
+                git status --porcelain
+                git commit -m "Add daily code reports and update README for $(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S CST')"
+                
+                # 推送更改
+                echo "Pushing changes..."
+                max_retries=3
+                retry_count=0
+                
+                while [ $retry_count -lt $max_retries ]; do
+                  if git push origin main; then
+                    echo "Reports and README committed and pushed successfully"
+                    break
+                  else
+                    echo "Push failed, attempt $((retry_count + 1))/$max_retries"
+                    retry_count=$((retry_count + 1))
+                    
+                    if [ $retry_count -lt $max_retries ]; then
+                      echo "Pulling latest changes and retrying..."
+                      git pull origin main --rebase
+                    else
+                      echo "Max retries reached, push failed"
+                      exit 1
+                    fi
+                  fi
+                done
+              fi
+            else
+              echo "No changes detected"
+            fi
+          else
+            echo "No files to process"
           fi
