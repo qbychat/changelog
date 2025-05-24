@@ -1,6 +1,5 @@
 import os
 import requests
-import hashlib
 from datetime import datetime, timedelta
 from dateutil import parser
 
@@ -28,9 +27,9 @@ github_headers = {
     "Accept": "application/vnd.github.v3+json"
 }
 
-def generate_file_hash(content):
-    """Generate a short hash for file naming"""
-    return hashlib.md5(content.encode()).hexdigest()[:8]
+def generate_timestamp():
+    """Generate timestamp for file naming"""
+    return datetime.now().strftime("%Y%m%d_%H%M%S")
 
 def get_commits(repo, since, until):
     """Fetch commits for a given repository"""
@@ -121,30 +120,43 @@ def process_commits(commits, repo):
 def generate_report(commits_text, repo):
     """Generate report using DeepSeek API"""
     try:
+        # 格式化日期范围
+        date_range = f"{since_date.strftime('%Y-%m-%d')}至{today.strftime('%Y-%m-%d')}"
+        
         prompt = (
-            "作为技术文档工程师，请根据以下Git提交记录生成专业开发报告。要求：\n"
-            "1. 严格按开发规范分类\n"
-            "2. 突出核心功能变更\n"
-            "3. 标注涉及的技术栈\n\n"
-            "## [YYYY-MM-DD至YYYY-MM-DD] 开发报告\n"
-            "### 核心功能迭代\n"
-            "- [模块] 描述变更（使用✅❌标注BREAKING CHANGE）\n"
-            "  ∟ 技术细节：涉及的技术组件\n"
-            "  ∟ 相关提交：提交哈希\n"
-            "### 服务端修复\n"
-            "- [稳定性] 描述问题（标注严重级别）\n"
-            "  ∟ 根本原因：简明技术分析\n"
-            "  ∟ 修复方案\n"
-            "### 架构调整\n"
-            "- [数据库] 结构变更\n"
-            "  ∟ 迁移指南\n"
-            "### 开发者须知\n"
-            "- 需特别注意的变更\n"
-            "- 新引入的依赖库\n\n"
-            "报告要求：\n"
-            "1. 使用专业术语\n"
-            "2. 区分功能类型\n"
-            "3. 包含影响评估\n\n"
+            "作为技术文档工程师，请根据以下Git提交记录生成专业开发报告。\n\n"
+            "请严格按照以下格式输出报告：\n\n"
+            f"## [{date_range}] 开发报告\n\n"
+            "### 🚀 新功能开发\n"
+            "- 描述新增的功能特性\n"
+            "  - 涉及文件：相关文件列表\n"
+            "  - 提交记录：SHA简码\n\n"
+            "### 🐛 问题修复\n"
+            "- 描述修复的问题\n"
+            "  - 问题类型：bug/性能/安全等\n"
+            "  - 影响范围：描述影响\n"
+            "  - 提交记录：SHA简码\n\n"
+            "### 🔧 代码优化\n"
+            "- 描述代码改进和重构\n"
+            "  - 优化类型：性能/可读性/架构等\n"
+            "  - 提交记录：SHA简码\n\n"
+            "### 📦 依赖更新\n"
+            "- 描述依赖库的更新\n"
+            "  - 更新内容：版本变化\n"
+            "  - 提交记录：SHA简码\n\n"
+            "### 📝 文档更新\n"
+            "- 描述文档相关的更新\n"
+            "  - 更新内容：新增/修改的文档\n"
+            "  - 提交记录：SHA简码\n\n"
+            "### ⚠️ 重要提醒\n"
+            "- 需要特别注意的变更（如破坏性变更）\n"
+            "- 部署时需要的特殊操作\n\n"
+            "**分析要求：**\n"
+            "1. 根据提交信息智能分类到对应章节\n"
+            "2. 提取关键技术信息和影响范围\n"
+            "3. 如果某个分类没有相关提交，可以省略该章节\n"
+            "4. 保持专业和简洁的描述风格\n"
+            "5. SHA码只显示前8位\n\n"
             "以下是提交记录：\n\n"
             f"{commits_text}"
         )
@@ -194,9 +206,9 @@ def save_report(content, repo_name):
         run_dir = f"logs/{today.isoformat()}"
         os.makedirs(run_dir, exist_ok=True)
         
-        # Generate filename with hash
-        file_hash = generate_file_hash(content)
-        filename = f"{run_dir}/{repo_name.replace('/', '_')}_report_{file_hash}.md"
+        # Generate filename with timestamp
+        timestamp = generate_timestamp()
+        filename = f"{run_dir}/{repo_name.replace('/', '_')}_report_{timestamp}.md"
         
         print(f"准备保存报告，内容长度: {len(content)} 字符")
         print(f"目标路径: {filename}")
