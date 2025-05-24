@@ -19,6 +19,7 @@ since_date = today - timedelta(days=days_to_cover)
 
 print(f"Generating reports for period: {since_date} to {today}")
 print(f"Manual trigger: {is_manual}")
+print(f"Current repository (will be skipped): {current_repo}")
 print(f"Additional repositories to process: {additional_repos}")
 
 # GitHub API headers
@@ -252,8 +253,6 @@ def main():
     
     # 检查环境变量
     missing_vars = []
-    if not current_repo:
-        missing_vars.append('GITHUB_REPOSITORY')
     if not github_token:
         missing_vars.append('GITHUB_TOKEN')
     if not api_key:
@@ -263,29 +262,25 @@ def main():
         print(f"Missing required environment variables: {', '.join(missing_vars)}")
         return
     
-    # Process current repository
-    current_repo_report = process_repository(current_repo)
-
+    # 不处理当前仓库，只处理额外的仓库
+    print(f"Skipping current repository: {current_repo}")
+    
     # Process additional repositories
     additional_reports = []
     for repo in additional_repos:
-        if repo and repo != current_repo:
+        if repo and repo != current_repo:  # 确保不处理当前仓库
             report_path = process_repository(repo)
             if report_path:
                 additional_reports.append(report_path)
 
     print("\nReport generation complete!")
-    if current_repo_report:
-        print(f"Current repository report: {current_repo_report}")
-    else:
-        print("No report generated for current repository")
         
     if additional_reports:
-        print("Additional repository reports:")
+        print("Generated repository reports:")
         for report in additional_reports:
             print(f"- {report}")
     else:
-        print("No additional repository reports generated")
+        print("No repository reports generated")
 
 if __name__ == "__main__":
     main()
