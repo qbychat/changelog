@@ -67,6 +67,10 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           
+          # 先拉取远程更改以避免推送冲突
+          echo "Pulling latest changes..."
+          git pull origin main --rebase
+          
           # 添加所有变更的文件
           git add logs/ README.md
           
@@ -77,6 +81,27 @@ jobs:
             echo "Changes detected, committing..."
             git status --porcelain
             git commit -m "Add daily code reports and update README for $(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S CST')"
-            git push
-            echo "Reports and README committed and pushed successfully"
+            
+            # 推送前再次检查并处理可能的冲突
+            echo "Pushing changes..."
+            max_retries=3
+            retry_count=0
+            
+            while [ $retry_count -lt $max_retries ]; do
+              if git push origin main; then
+                echo "Reports and README committed and pushed successfully"
+                break
+              else
+                echo "Push failed, attempt $((retry_count + 1))/$max_retries"
+                retry_count=$((retry_count + 1))
+                
+                if [ $retry_count -lt $max_retries ]; then
+                  echo "Pulling latest changes and retrying..."
+                  git pull origin main --rebase
+                else
+                  echo "Max retries reached, push failed"
+                  exit 1
+                fi
+              fi
+            done
           fi
