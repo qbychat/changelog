@@ -10,7 +10,7 @@ api_key = os.getenv('DEEPSEEK_API_KEY')
 github_token = os.getenv('GITHUB_TOKEN')
 is_manual = os.getenv('IS_MANUAL_TRIGGER', 'false').lower() == 'true'
 days_to_cover = int(os.getenv('DAYS_TO_COVER', '1'))
-additional_repos = os.getenv('ADDITIONAL_REPOS', '').split(',')  # Comma-separated list of repos
+additional_repos = os.getenv('ADDITIONAL_REPOS').split(',')  # Comma-separated list of repos
 
 # Date setup
 today = datetime.utcnow().date()
