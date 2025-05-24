@@ -36,5 +36,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           IS_MANUAL_TRIGGER: ${{ github.event_name == 'workflow_dispatch' }}
           DAYS_TO_COVER: ${{ inputs.days_to_cover || 1 }}
+          ADDITIONAL_REPOS: ${{ secrets.ADDITIONAL_REPOS }}
         run: |
           python generate_log.py
