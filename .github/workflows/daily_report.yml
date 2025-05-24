@@ -1,0 +1,74 @@
+name: Daily Code Report
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 每天 UTC 时间 00:00 运行（修复了cron语法）
+  workflow_dispatch:     # 允许手动触发
+    inputs:
+      days_to_cover:
+        description: 'days to cover (for manual trigger)'
+        required: false
+        default: '1'
+permissions:
+  contents: write  # 需要写权限来提交文件
+  issues: write
+jobs:
+  generate-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 获取完整历史记录以便比较差异
+          token: ${{ secrets.GITHUB_TOKEN }}  # 确保使用正确的token
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests python-dateutil
+      
+      - name: Generate daily report
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IS_MANUAL_TRIGGER: ${{ github.event_name == 'workflow_dispatch' }}
+          DAYS_TO_COVER: ${{ inputs.days_to_cover || 1 }}
+          ADDITIONAL_REPOS: ${{ secrets.ADDITIONAL_REPOS }}
+        run: |
+          python generate_log.py
+      
+      - name: Check generated files
+        run: |
+          echo "Checking generated files..."
+          if [ -d "logs" ]; then
+            find logs -name "*.md" -type f
+            echo "Files found:"
+            ls -la logs/*/
+          else
+            echo "No logs directory found"
+          fi
+      
+      - name: Commit and push reports
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          # 检查是否有新文件
+          if [ -d "logs" ] && [ "$(find logs -name '*.md' -type f | wc -l)" -gt 0 ]; then
+            git add logs/
+            
+            # 检查是否有变更
+            if git diff --staged --quiet; then
+              echo "No changes to commit"
+            else
+              git commit -m "Add daily code reports for $(date +'%Y-%m-%d')"
+              git push
+              echo "Reports committed and pushed successfully"
+            fi
+          else
+            echo "No report files to commit"
+          fi
