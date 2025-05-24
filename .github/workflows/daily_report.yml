@@ -52,24 +52,31 @@ jobs:
           else
             echo "No logs directory found"
           fi
+          
+          # 检查README.md是否存在和被修改
+          if [ -f "README.md" ]; then
+            echo "README.md exists"
+            echo "README.md content preview:"
+            head -20 README.md
+          else
+            echo "README.md not found"
+          fi
       
       - name: Commit and push reports
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           
-          # 检查是否有新文件
-          if [ -d "logs" ] && [ "$(find logs -name '*.md' -type f | wc -l)" -gt 0 ]; then
-            git add logs/
-            
-            # 检查是否有变更
-            if git diff --staged --quiet; then
-              echo "No changes to commit"
-            else
-              git commit -m "Add daily code reports for $(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S CST')"
-              git push
-              echo "Reports committed and pushed successfully"
-            fi
+          # 添加所有变更的文件
+          git add logs/ README.md
+          
+          # 检查是否有变更
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
           else
-            echo "No report files to commit"
+            echo "Changes detected, committing..."
+            git status --porcelain
+            git commit -m "Add daily code reports and update README for $(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M:%S CST')"
+            git push
+            echo "Reports and README committed and pushed successfully"
           fi
