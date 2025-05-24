@@ -28,7 +28,7 @@ github_headers = {
 
 def generate_timestamp():
     """Generate timestamp for file naming"""
-    return datetime.now().strftime("%Y%m%d_%H%M%S")
+    return datetime.now().strftime("%H%M%S")
 
 def get_commits(repo, since, until):
     """Fetch commits for a given repository"""
@@ -207,7 +207,7 @@ def save_report(content, repo_name):
         
         # Generate filename with timestamp
         timestamp = generate_timestamp()
-        filename = f"{run_dir}/{repo_name.replace('/', '_')}_report_{timestamp}.md"
+        filename = f"{run_dir}/{timestamp}_{repo_name.replace('/', '_')}.md"
         
         print(f"准备保存报告，内容长度: {len(content)} 字符")
         print(f"目标路径: {filename}")
