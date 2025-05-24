@@ -2,9 +2,9 @@ import os
 import requests
 from datetime import datetime, timedelta
 from dateutil import parser
+import re
 
 # Configuration
-current_repo = os.getenv('GITHUB_REPOSITORY')
 api_key = os.getenv('DEEPSEEK_API_KEY')
 github_token = os.getenv('GITHUB_TOKEN')
 is_manual = os.getenv('IS_MANUAL_TRIGGER', 'false').lower() == 'true'
@@ -18,7 +18,6 @@ since_date = today - timedelta(days=days_to_cover)
 
 print(f"Generating reports for period: {since_date} to {today}")
 print(f"Manual trigger: {is_manual}")
-print(f"Current repository (will be skipped): {current_repo}")
 print(f"Additional repositories to process: {additional_repos}")
 
 # GitHub API headers
@@ -223,6 +222,67 @@ def save_report(content, repo_name):
         print(f"保存报告时发生异常: {str(e)}")
         return None
 
+def update_readme(generated_reports):
+    """Update README.md with links to generated reports"""
+    try:
+        readme_path = "README.md"
+        
+        # Read existing README or create new one
+        if os.path.exists(readme_path):
+            with open(readme_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+        else:
+            content = "# Daily Development Reports\n\n"
+        
+        # Prepare new entry for today
+        date_str = today.strftime('%Y-%m-%d')
+        new_entry = f"\n## {date_str}\n\n"
+        
+        for report_path in generated_reports:
+            # Extract filename from path
+            filename = os.path.basename(report_path)
+            # Create relative path from README to report
+            relative_path = report_path
+            new_entry += f"[{filename}]({relative_path})\n\n"
+        
+        # Check if today's date already exists in README
+        date_pattern = f"## {re.escape(date_str)}"
+        
+        if re.search(date_pattern, content):
+            # Replace existing entry for today
+            # Find the section for today and replace it
+            pattern = f"(## {re.escape(date_str)}.*?)(?=## \\d{{4}}-\\d{{2}}-\\d{{2}}|$)"
+            replacement = f"## {date_str}\n\n" + "\n".join([f"[{os.path.basename(path)}]({path})\n" for path in generated_reports]) + "\n"
+            content = re.sub(pattern, replacement, content, flags=re.DOTALL)
+        else:
+            # Add new entry at the beginning (after title if exists)
+            if content.startswith("# "):
+                # Find end of title section
+                lines = content.split('\n')
+                title_end = 0
+                for i, line in enumerate(lines):
+                    if line.startswith("# "):
+                        title_end = i + 1
+                        break
+                
+                # Insert new entry after title
+                lines.insert(title_end + 1, new_entry.strip())
+                content = '\n'.join(lines)
+            else:
+                # No title found, add at beginning
+                content = new_entry + content
+        
+        # Write updated README
+        with open(readme_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+        
+        print(f"README.md updated with {len(generated_reports)} report links")
+        return True
+        
+    except Exception as e:
+        print(f"更新 README.md 时发生异常: {str(e)}")
+        return False
+
 def process_repository(repo):
     """Process a single repository"""
     print(f"\nProcessing repository: {repo}")
@@ -274,16 +334,12 @@ def main():
         print(f"Missing required environment variables: {', '.join(missing_vars)}")
         return
     
-    # 不处理当前仓库，只处理额外的仓库
-    print(f"Skipping current repository: {current_repo}")
-    
     # Process additional repositories
     additional_reports = []
     for repo in additional_repos:
-        if repo and repo != current_repo:  # 确保不处理当前仓库
-            report_path = process_repository(repo)
-            if report_path:
-                additional_reports.append(report_path)
+        report_path = process_repository(repo)
+        if report_path:
+            additional_reports.append(report_path)
 
     print("\nReport generation complete!")
         
@@ -291,6 +347,13 @@ def main():
         print("Generated repository reports:")
         for report in additional_reports:
             print(f"- {report}")
+        
+        # Update README.md with links to generated reports
+        print("\nUpdating README.md...")
+        if update_readme(additional_reports):
+            print("README.md updated successfully!")
+        else:
+            print("Failed to update README.md")
     else:
         print("No repository reports generated")
 
