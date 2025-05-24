@@ -125,7 +125,10 @@ def generate_report(commits_text, repo):
         "stream": False
     }
 
+    print(f"准备调用 DeepSeek API，内容长度: {len(prompt)} 字符")
     response = requests.post(deepseek_url, headers=headers, json=data)
+    print(f"DeepSeek API 响应状态码: {response.status_code}")
+    print(f"响应内容: {response.text}")  # 注意可能含敏感信息，调试后删除
     result = response.json()
     return result['choices'][0]['message']['content']
 
@@ -141,7 +144,8 @@ def save_report(content, repo_name):
     # Generate filename with hash
     file_hash = generate_file_hash(content)
     filename = f"{run_dir}/{repo_name.replace('/', '_')}_report_{file_hash}.md"
-    
+    print(f"准备保存报告，内容长度: {len(report_content)} 字符")
+    print(f"目标路径: {filename}")
     with open(filename, 'w', encoding='utf-8') as f:
         f.write(content)
     
