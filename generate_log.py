@@ -289,11 +289,25 @@ def update_readme(generated_reports):
             # 替换今天现有的条目
             # 使用更精确的正则表达式来匹配整个日期section
             pattern = f"(## {re.escape(date_str)}.*?)(?=\n## \\d{{4}}-\\d{{2}}-\\d{{2}}|\n# |$)"
-            replacement = f"## {date_str}\n\n" + "\n".join([
-                f"- [{extract_timestamp(path)[:2]}:{extract_timestamp(path)[2:4]}:{extract_timestamp(path)[4:6]}] "
-                f"[{os.path.basename(path)[7:-3] if re.match(r'^\\d{{6}}_', os.path.basename(path)) else os.path.basename(path)[:-3]}]({path})"
-                for path in all_today_reports
-            ]) + "\n"
+            
+            # 构建替换内容
+            replacement_lines = []
+            for path in all_today_reports:
+                timestamp = extract_timestamp(path)
+                formatted_time = f"{timestamp[:2]}:{timestamp[2:4]}:{timestamp[4:6]}"
+                filename = os.path.basename(path)
+                
+                # 提取仓库名
+                repo_name = filename
+                timestamp_pattern = r'^\d{6}_'
+                if re.match(timestamp_pattern, filename):
+                    repo_name = filename[7:]  # 去掉时间戳前缀
+                if repo_name.endswith('.md'):
+                    repo_name = repo_name[:-3]  # 去掉.md后缀
+                
+                replacement_lines.append(f"- [{formatted_time}] [{repo_name}]({path})")
+            
+            replacement = f"## {date_str}\n\n" + "\n".join(replacement_lines) + "\n"
             
             content = re.sub(pattern, replacement, content, flags=re.DOTALL)
         else:
