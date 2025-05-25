@@ -2,8 +2,8 @@ import os
 import requests
 from datetime import datetime, timedelta
 from dateutil import parser
-import pytz
 import re
+import pytz
 
 # Configuration
 api_key = os.getenv('DEEPSEEK_API_KEY')
@@ -13,22 +13,19 @@ days_to_cover = int(os.getenv('DAYS_TO_COVER', '1'))
 additional_repos_str = os.getenv('ADDITIONAL_REPOS', '')
 additional_repos = [repo.strip() for repo in additional_repos_str.split(',') if repo.strip()]
 
-# 设置时区 - 使用北京时间
-beijing_tz = pytz.timezone('Asia/Shanghai')
-utc_tz = pytz.UTC
+# 时区设置 - 统一使用一个时区（可以根据需要调整）
+# 可以设置为 'Asia/Shanghai', 'America/New_York', 'Europe/London' 等
+TIMEZONE = os.getenv('TIMEZONE', 'UTC')
+tz = pytz.timezone(TIMEZONE)
 
-# Date setup - 使用北京时间
-beijing_now = datetime.now(beijing_tz)
-today = beijing_now.date()
+# Date setup - 统一使用指定时区
+now = datetime.now(tz)
+today = now.date()
 since_date = today - timedelta(days=days_to_cover)
 
-# 转换为UTC时间用于GitHub API调用
-today_utc_start = beijing_tz.localize(datetime.combine(today, datetime.min.time())).astimezone(utc_tz)
-since_utc_start = beijing_tz.localize(datetime.combine(since_date, datetime.min.time())).astimezone(utc_tz)
-
-print(f"北京时间当前时间: {beijing_now.strftime('%Y-%m-%d %H:%M:%S %Z')}")
-print(f"生成报告的北京时间日期范围: {since_date} 到 {today}")
-print(f"对应的UTC时间范围: {since_utc_start.isoformat()} 到 {today_utc_start.isoformat()}")
+print(f"Using timezone: {TIMEZONE}")
+print(f"Current time: {now.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+print(f"Generating reports for period: {since_date} to {today}")
 print(f"Manual trigger: {is_manual}")
 print(f"Additional repositories to process: {additional_repos}")
 
@@ -39,19 +36,28 @@ github_headers = {
 }
 
 def generate_timestamp():
-    """Generate timestamp for file naming - 使用北京时间"""
-    return beijing_now.strftime("%H%M%S")
+    """Generate timestamp for file naming - 使用统一时区"""
+    return now.strftime("%H%M%S")
+
+def get_current_datetime():
+    """获取当前时区的datetime对象"""
+    return datetime.now(tz)
 
 def get_commits(repo, since, until):
     """Fetch commits for a given repository"""
     try:
         commits_url = f"https://api.github.com/repos/{repo}/commits"
+        # 转换为UTC时间用于API调用
+        since_utc = datetime.combine(since, datetime.min.time()).replace(tzinfo=tz).astimezone(pytz.UTC)
+        until_utc = datetime.combine(until, datetime.min.time()).replace(tzinfo=tz).astimezone(pytz.UTC)
+        
         params = {
-            "since": since.isoformat(),
-            "until": until.isoformat()
+            "since": since_utc.isoformat(),
+            "until": until_utc.isoformat()
         }
         
         print(f"Fetching commits from: {commits_url}")
+        print(f"Time range (UTC): {since_utc.isoformat()} to {until_utc.isoformat()}")
         response = requests.get(commits_url, headers=github_headers, params=params)
         print(f"GitHub API response status: {response.status_code}")
         
@@ -85,8 +91,12 @@ def process_commits(commits, repo):
                 sha = commit['sha']
                 author = commit['commit']['author']['name']
                 message = commit['commit']['message']
+                commit_date = commit['commit']['author']['date']
                 
-                print(f"Processing commit: {sha[:8]}...")
+                # 转换提交时间到本地时区
+                commit_dt = parser.parse(commit_date).astimezone(tz)
+                
+                print(f"Processing commit: {sha[:8]} at {commit_dt.strftime('%Y-%m-%d %H:%M:%S %Z')}")
                 
                 # Get commit diff
                 diff_url = f"https://api.github.com/repos/{repo}/commits/{sha}"
@@ -107,16 +117,17 @@ def process_commits(commits, repo):
                         f"Repository: {repo}\n"
                         f"SHA: {sha}\n"
                         f"Author: {author}\n"
+                        f"Date: {commit_dt.strftime('%Y-%m-%d %H:%M:%S %Z')}\n"
                         f"Message: {message}\n"
                         f"Files changed: {', '.join(file_changes) if file_changes else 'No files info'}\n"
                     )
                 else:
                     print(f"Failed to get diff for commit {sha}: {diff_response.status_code}")
-                    # 即使获取diff失败，也保存基本commit信息
                     commit_messages.append(
                         f"Repository: {repo}\n"
                         f"SHA: {sha}\n"
                         f"Author: {author}\n"
+                        f"Date: {commit_dt.strftime('%Y-%m-%d %H:%M:%S %Z')}\n"
                         f"Message: {message}\n"
                         f"Files changed: Unable to fetch diff\n"
                     )
@@ -213,16 +224,17 @@ def save_report(content, repo_name):
         # Create logs directory if not exists
         os.makedirs('logs', exist_ok=True)
         
-        # Create subdirectory for this run - 使用北京时间日期
+        # Create subdirectory for this run - 使用当前时区的日期
         run_dir = f"logs/{today.isoformat()}"
         os.makedirs(run_dir, exist_ok=True)
         
-        # Generate filename with timestamp - 使用北京时间时间戳
+        # Generate filename with timestamp - 使用统一的时间戳
         timestamp = generate_timestamp()
         filename = f"{run_dir}/{timestamp}_{repo_name.replace('/', '_')}.md"
         
         print(f"准备保存报告，内容长度: {len(content)} 字符")
         print(f"目标路径: {filename}")
+        print(f"使用日期: {today} (来自时区: {TIMEZONE})")
         
         with open(filename, 'w', encoding='utf-8') as f:
             f.write(content)
@@ -246,7 +258,7 @@ def update_readme(generated_reports):
         else:
             content = "# Daily Development Reports\n\n"
         
-        # 获取今天日期的所有报告文件 - 使用北京时间日期
+        # 获取今天日期的所有报告文件
         date_str = today.strftime('%Y-%m-%d')
         run_dir = f"logs/{date_str}"
         
@@ -349,6 +361,7 @@ def update_readme(generated_reports):
             f.write(content)
         
         print(f"README.md updated with {len(all_today_reports)} report links (sorted by time)")
+        print(f"Date used for categorization: {date_str} (timezone: {TIMEZONE})")
         return True
         
     except Exception as e:
@@ -368,8 +381,7 @@ def process_repository(repo):
         print(f"DeepSeek API key not found, skipping {repo}")
         return None
     
-    # 使用UTC时间调用GitHub API
-    commits = get_commits(repo, since_utc_start, today_utc_start)
+    commits = get_commits(repo, since_date, today)
     
     if not commits:
         if is_manual:
@@ -395,6 +407,8 @@ def process_repository(repo):
 # 主执行逻辑
 def main():
     print("Starting report generation...")
+    print(f"Current working timezone: {TIMEZONE}")
+    print(f"Current time: {now.strftime('%Y-%m-%d %H:%M:%S %Z')}")
     
     # 检查环境变量
     missing_vars = []
