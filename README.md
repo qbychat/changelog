@@ -2,12 +2,9 @@
 changelogs of qbychat
 ## 2025-05-25
 
-- [07:54:07] [qbychat-web](logs/2025-05-25/075407_qbychat-web.md)
-- [07:54:07] [qbychat](logs/2025-05-25/075407_qbychat.md)
-- [07:54:07] [qbychat-proto](logs/2025-05-25/075407_qbychat-proto.md)
-- [00:02:49] [qbychat-proto](logs/2025-05-25/000249_qbychat-proto.md)
-- [00:02:49] [qbychat](logs/2025-05-25/000249_qbychat.md)
-- [00:02:49] [qbychat-web](logs/2025-05-25/000249_qbychat-web.md)
+- [08:13:29] [qbychat-proto](logs/2025-05-25/081329_qbychat-proto.md)
+- [08:13:18] [qbychat-web](logs/2025-05-25/081318_qbychat-web.md)
+- [08:13:09] [qbychat](logs/2025-05-25/081309_qbychat.md)
 
 ## 2025-05-24
 
