@@ -1,13 +1,15 @@
 name: Daily Code Report
 on:
   schedule:
-    - cron: '0 16 * * *'  # 每天北京时间 00:00 运行（UTC时间16:00）
-  workflow_dispatch:     # 允许手动触发
+    - cron: '0 1 * * *'
+  workflow_dispatch:
     inputs:
       days_to_cover:
         description: 'days to cover (for manual trigger)'
         required: false
         default: '1'
+env:
+  TZ: Asia/Shanghai
 permissions:
   contents: write  # 需要写权限来提交文件
   issues: write
@@ -38,7 +40,7 @@ jobs:
           IS_MANUAL_TRIGGER: ${{ github.event_name == 'workflow_dispatch' }}
           DAYS_TO_COVER: ${{ inputs.days_to_cover || 1 }}
           ADDITIONAL_REPOS: ${{ secrets.ADDITIONAL_REPOS }}
-          TZ: 'Asia/Shanghai'  # 设置时区为中国时间
+          TZ: 'Asia/Shanghai'
         run: |
           python generate_log.py
       
