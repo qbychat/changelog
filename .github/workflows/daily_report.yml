@@ -1,15 +1,13 @@
 name: Daily Code Report
 on:
   schedule:
-    - cron: '0 1 * * *'
+    - cron: '0 17 * * *'
   workflow_dispatch:
     inputs:
       days_to_cover:
         description: 'days to cover (for manual trigger)'
         required: false
         default: '1'
-env:
-  TZ: Asia/Shanghai
 permissions:
   contents: write  # 需要写权限来提交文件
   issues: write
