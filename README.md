@@ -1,5 +1,8 @@
 # changelog
 changelogs of qbychat
+## 2025-05-27
+
+- [01:21:09] [qbychat-proto](logs/2025-05-27/012109_qbychat-proto.md)
 ## 2025-05-26
 
 - [09:45:48] [qbychat-proto](logs/2025-05-26/094548_qbychat-proto.md)
